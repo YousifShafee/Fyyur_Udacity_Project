@@ -3,80 +3,25 @@
 # ----------------------------------------------------------------------------#
 
 import dateutil.parser
+from datetime import datetime
 from babel import dates
-from flask import Flask, render_template, request, flash, redirect, url_for
+from flask import render_template, request, flash, redirect, url_for
 from flask_moment import Moment
-from flask_sqlalchemy import SQLAlchemy
 import logging
 from forms import *
 from logging import Formatter, FileHandler
-from flask_migrate import Migrate
+from models import *
 
-# from flask_wtf import Form
-# from forms import *
 # ----------------------------------------------------------------------------#
 # App Config.
 # ----------------------------------------------------------------------------#
 
-app = Flask(__name__)
-moment = Moment(app)
 app.config.from_object('config')
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
+moment = Moment(app)
+db.init_app(app)
 
 
 # TODO: connect to a local postgresql database
-
-# ----------------------------------------------------------------------------#
-# Models.
-# ----------------------------------------------------------------------------#
-
-class Show(db.Model):
-    __tablename__ = 'show'
-    venue_id = db.Column(db.Integer, db.ForeignKey('venue.id'), primary_key=True)
-    artist_id = db.Column(db.Integer, db.ForeignKey('artist.id'), primary_key=True)
-    start_time = db.Column(db.String(30), nullable=False)
-    artist = db.relationship("Artist")
-    venue = db.relationship("Venue")
-
-
-class Venue(db.Model):
-    __tablename__ = 'venue'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String)
-    city = db.Column(db.String(120))
-    state = db.Column(db.String(120))
-    address = db.Column(db.String(120))
-    phone = db.Column(db.String(120))
-    image_link = db.Column(db.String(500))
-    genres = db.Column(db.String(500))
-    facebook_link = db.Column(db.String(120))
-    website = db.Column(db.String(120))
-    seeking_talent = db.Column(db.Boolean, default=True)
-    seeking_description = db.Column(db.String(500))
-    artists = db.relationship("Show")
-
-    # TODO: implement any missing fields, as a database migration using Flask-Migrate
-
-
-class Artist(db.Model):
-    __tablename__ = 'artist'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String)
-    city = db.Column(db.String(120))
-    state = db.Column(db.String(120))
-    phone = db.Column(db.String(120))
-    genres = db.Column(db.String(120))
-    image_link = db.Column(db.String(500))
-    facebook_link = db.Column(db.String(120))
-    website = db.Column(db.String(120))
-    seeking_talent = db.Column(db.Boolean, default=True)
-    seeking_description = db.Column(db.String(500))
-
-    # TODO: implement any missing fields, as a database migration using Flask-Migrate
-
-
-# TODO Implement Show and Artist models, and complete all model relationships and properties, as a database migration.
 
 # ----------------------------------------------------------------------------#
 # Filters.
@@ -136,7 +81,14 @@ def show_venue(venue_id):
     # TODO: replace with real venue data from the venues table, using venue_id
 
     data = Venue.query.get(venue_id)
-    return render_template('pages/show_venue.html', venue=data)
+    all_shows = Show.query.all()
+    show_list = [[], []]
+    for show in all_shows:
+        if dateutil.parser.parse(show.start_time) > datetime.utcnow() and show.venue_id == venue_id:
+            show_list[0].append(show)
+        elif show.venue_id == venue_id:
+            show_list[1].append(show)
+    return render_template('pages/show_venue.html', venue=data, shows=show_list)
 
 
 #  Create Venue
@@ -220,6 +172,9 @@ def edit_venue_submission(venue_id):
         venue.phone = form.phone.data
         venue.genres = form.genres.data
         venue.facebook_link = form.facebook_link.data
+        venue.website = form.website.data
+        venue.seeking_talent = form.seeking_talent.data
+        venue.seeking_description = form.seeking_description.data
         db.session.commit()
         flash('Venue ' + form.name.data + ' Edited Successfully.')
     except:
@@ -260,7 +215,17 @@ def show_artist(artist_id):
     # shows the venue page with the given venue_id
     # TODO: replace with real venue data from the venues table, using venue_id
     data = Artist.query.get(artist_id)
-    return render_template('pages/show_artist.html', artist=data)
+    # artist data in data[0]
+    all_shows = Show.query.all()
+    show_list = [[],[]]
+    for show in all_shows:
+        if dateutil.parser.parse(show.start_time) > datetime.utcnow() and show.artist_id == artist_id:
+            # upcoming_shows data
+            show_list[0].append(show)
+        elif show.artist_id == artist_id:
+            # past_shows data
+            show_list[1].append(show)
+    return render_template('pages/show_artist.html', artist=data, shows=show_list)
 
 
 #  Update
@@ -287,6 +252,9 @@ def edit_artist_submission(artist_id):
         artist.genres = form.genres.data
         artist.image_link = form.image_link.data
         artist.facebook_link = form.facebook_link.data
+        artist.website = form.website.data
+        artist.seeking_talent = form.seeking_talent.data
+        artist.seeking_description = form.seeking_description.data
         db.session.commit()
         flash('Artist ' + form.name.data + ' Edited Successfully.')
     except:
@@ -343,7 +311,7 @@ def shows():
     # displays list of shows at /shows
     # TODO: replace with real venues data.
     # num_shows should be aggregated based on number of upcoming shows per venue.
-    data = Show.query.all()
+    data = Show.query.join(Artist, Venue.artists)
     return render_template('pages/shows.html', shows=data)
 
 
@@ -360,10 +328,9 @@ def create_show_submission():
     # TODO: insert form data as a new Show record in the db, instead
     try:
         form = ShowForm(request.form)
-        venue = Venue.query.get(form.venue_id.data)
         show = Show(start_time=form.start_time.data)
         show.artist = Artist.query.get(form.artist_id.data)
-        venue.artists.append(show)
+        show.venue = Venue.query.get(form.venue_id.data)
         db.session.add(show)
         db.session.commit()
         flash('Show was successfully listed!')

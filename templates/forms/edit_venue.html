@@ -37,8 +37,28 @@
           {{ form.image_link(class_ = 'form-control', placeholder='http://', autofocus = true, value=venue.image_link) }}
       </div>
       <div class="form-group">
-          <label for="genres">Facebook Link</label>
+          <label for="facebook_link">Facebook Link</label>
           {{ form.facebook_link(class_ = 'form-control', placeholder='http://', autofocus = true, value=venue.facebook_link) }}
+        </div>
+        <div class="form-group">
+          <label for="website">Website</label>
+          {{ form.website(class_ = 'form-control', placeholder='http://', autofocus = true) }}
+        </div>
+        <style>
+        #seek_talent{
+          background-color: lightblue;
+        }
+        </style>
+        <div class="form-group">
+          <label for="seeking_talent">Seeking Talent</label>
+          <div id="seek_talent">
+              <input type="checkbox" {% if venue.seeking_talent %} checked {% endif %}
+                     {{ form.seeking_talent(class_ = 'form-control', autofocus = true) }}
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="seeking_description">Seeking Description</label>
+          {{ form.seeking_description(class_ = 'form-control', autofocus = true, value=venue.seeking_description) }}
         </div>
       <input type="submit" value="Edit Venue" class="btn btn-primary btn-lg btn-block">
     </form>
